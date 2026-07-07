@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Contribution Snake × Minesweeper — Ben Fern</title>
+<meta name="description" content="A playable Snake × Minesweeper mashup on a GitHub contribution grid. Eat contributions, avoid the hidden mines." />
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#21262d; --text:#c9d1d9; --muted:#8b949e;
+    --cell:#161b22; --snake:#8b5cf6; --snake-head:#a78bfa; --accent:#06b6d4;
+    --g1:#0e4429; --g2:#006d32; --g3:#26a641; --g4:#39d353; --mine:#e5534b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 600px at 50% -10%, #1b2233 0%, var(--bg) 55%);
+    color:var(--text); font-family:"Fira Code",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    min-height:100%; padding:18px 12px 28px; gap:14px;
+  }
+  h1{
+    font-size:clamp(18px,4.5vw,26px); margin:4px 0 0; text-align:center; font-weight:700;
+    background:linear-gradient(90deg,#6366f1,#8b5cf6,#06b6d4);
+    -webkit-background-clip:text; background-clip:text; color:transparent; letter-spacing:.5px;
+  }
+  .sub{color:var(--muted); font-size:12px; text-align:center; margin-top:-6px}
+  .hud{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%; max-width:720px}
+  .stat{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 14px;
+    display:flex; flex-direction:column; align-items:center; min-width:84px;
+  }
+  .stat b{font-size:20px; line-height:1} .stat span{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:3px}
+  .stage{position:relative; width:min(94vw,560px)}
+  canvas{
+    width:100%; height:auto; display:block; background:var(--panel);
+    border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.45);
+    image-rendering:auto;
+  }
+  .overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(13,17,23,.82); backdrop-filter:blur(3px); border-radius:14px; text-align:center; padding:20px;
+  }
+  .overlay.hide{display:none}
+  .overlay h2{margin:0; font-size:clamp(20px,5vw,30px)}
+  .overlay p{margin:0; color:var(--muted); font-size:13px; max-width:340px; line-height:1.6}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:11px; color:var(--muted)}
+  .legend i{display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:5px}
+  .btn{
+    appearance:none; border:0; cursor:pointer; font-family:inherit; font-weight:700; font-size:16px;
+    color:#fff; padding:13px 30px; border-radius:12px; letter-spacing:.5px;
+    background:linear-gradient(90deg,#6366f1,#8b5cf6); box-shadow:0 6px 20px rgba(139,92,246,.4);
+    transition:transform .08s ease, box-shadow .2s ease;
+  }
+  .btn:active{transform:translateY(2px) scale(.98)}
+  .btn.small{font-size:13px; padding:9px 18px; background:linear-gradient(90deg,#06b6d4,#6366f1)}
+  .controls{display:none; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(2,64px); gap:8px; margin-top:2px}
+  .controls button{
+    background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:12px;
+    font-size:22px; cursor:pointer; font-family:inherit;
+  }
+  .controls button:active{background:#20283a}
+  .controls .up{grid-column:2; grid-row:1} .controls .left{grid-column:1; grid-row:2}
+  .controls .down{grid-column:2; grid-row:2} .controls .right{grid-column:3; grid-row:2}
+  .foot{color:var(--muted); font-size:12px; text-align:center}
+  .foot a{color:var(--accent); text-decoration:none} .foot a:hover{text-decoration:underline}
+  .keys{font-size:11px; color:var(--muted)}
+  .keys kbd{background:var(--panel); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:11px}
+  @media (hover:none) and (pointer:coarse){ .controls{display:grid} .keys{display:none} }
+</style>
+</head>
+<body>
+  <h1>🐍 Contribution Snake × 💣 Minesweeper</h1>
+  <div class="sub">Eat the green contributions. Avoid the hidden mines. Numbers = nearby mines.</div>
+
+  <div class="hud">
+    <div class="stat"><b id="score">0</b><span>Score</span></div>
+    <div class="stat"><b id="best">0</b><span>Best</span></div>
+    <div class="stat"><b id="mines">0</b><span>Mines left</span></div>
+    <div class="stat"><b id="len">3</b><span>Length</span></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="game" width="560" height="560" aria-label="Contribution Snake game board"></canvas>
+    <div class="overlay" id="overlay">
+      <h2 id="ovTitle">Ready?</h2>
+      <p id="ovText">Guide the snake across your contribution graph, eat the bright-green cells to grow, and use the minesweeper numbers to dodge the hidden mines. One wrong move and 💥.</p>
+      <div class="legend">
+        <span><i style="background:#39d353"></i>Contribution (food)</span>
+        <span><i style="background:#8b5cf6"></i>Snake</span>
+        <span><i style="background:#e5534b"></i>Mine (hidden)</span>
+      </div>
+      <button class="btn" id="playBtn">▶ Play</button>
+      <div class="keys">Move with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows · <kbd>P</kbd> pause</div>
+    </div>
+  </div>
+
+  <div class="controls" id="pad">
+    <button class="up" data-dir="up" aria-label="up">▲</button>
+    <button class="left" data-dir="left" aria-label="left">◀</button>
+    <button class="down" data-dir="down" aria-label="down">▼</button>
+    <button class="right" data-dir="right" aria-label="right">▶</button>
+  </div>
+
+  <div class="foot">
+    Built by <a href="https://github.com/blm3886" target="_blank" rel="noopener">Ben Fern</a> ·
+    a mashup of my <a href="https://github.com/blm3886/Minesweeper" target="_blank" rel="noopener">Minesweeper</a> &amp; contribution-snake ·
+    <a href="https://github.com/blm3886/contribution-snake" target="_blank" rel="noopener">source</a>
+  </div>
+
+<script>
+(() => {
+  const COLS = 28, ROWS = 28, GAP = 2;
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const el = id => document.getElementById(id);
+  const scoreEl=el('score'), bestEl=el('best'), minesEl=el('mines'), lenEl=el('len');
+  const overlay=el('overlay'), ovTitle=el('ovTitle'), ovText=el('ovText'), playBtn=el('playBtn');
+
+  // logical pixel size of a cell (canvas is 560, but we render crisp via DPR)
+  let CELL, PAD;
+  function layout(){
+    const size = Math.min(560, Math.floor(Math.min(window.innerWidth*0.94, 560)));
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = size*dpr; canvas.height = size*dpr;
+    canvas.style.width = size+'px'; canvas.style.height = size+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    CELL = (size - GAP) / COLS; PAD = GAP/2;
+  }
+  window.addEventListener('resize', () => { layout(); draw(); });
+
+  const MINE_COUNT = 22;
+  let snake, dir, nextDir, food, mines, revealed, score, best, running, dead, tick, acc, lastT, speed;
+  best = +(localStorage.getItem('csnake_best')||0); bestEl.textContent = best;
+
+  const key = (x,y) => x+','+y;
+  function rndEmpty(exclude){
+    let x,y,guard=0;
+    do{ x=(Math.random()*COLS)|0; y=(Math.random()*ROWS)|0; guard++; }
+    while(guard<999 && (exclude.has(key(x,y))));
+    return {x,y};
+  }
+  function occupied(){ const s=new Set(snake.map(p=>key(p.x,p.y))); return s; }
+
+  function adjacentMines(x,y){
+    let n=0;
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+      if(!dx&&!dy)continue; const nx=x+dx, ny=y+dy;
+      if(nx<0||ny<0||nx>=COLS||ny>=ROWS)continue;
+      if(mines.has(key(nx,ny)))n++;
+    }
+    return n;
+  }
+
+  function reset(){
+    const cx=(COLS/2)|0, cy=(ROWS/2)|0;
+    snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+    dir={x:1,y:0}; nextDir={x:1,y:0};
+    score=0; dead=false; running=true; tick=0; acc=0; lastT=0; speed=120;
+    revealed=new Map();
+    // place mines away from the snake spawn
+    mines=new Set();
+    const safe=new Set(snake.map(p=>key(p.x,p.y)));
+    for(let dx=-2;dx<=3;dx++){ safe.add(key(cx+dx,cy)); }
+    let placed=0, guard=0;
+    while(placed<MINE_COUNT && guard<9999){
+      guard++;
+      const x=(Math.random()*COLS)|0, y=(Math.random()*ROWS)|0;
+      if(safe.has(key(x,y))||mines.has(key(x,y)))continue;
+      mines.add(key(x,y)); placed++;
+    }
+    food=spawnFood();
+    updateHUD();
+  }
+  function spawnFood(){
+    const occ=occupied();
+    const ex=new Set([...occ, ...mines]);
+    return rndEmpty(ex);
+  }
+  function updateHUD(){
+    scoreEl.textContent=score; minesEl.textContent=MINE_COUNT; lenEl.textContent=snake.length;
+  }
+
+  function setDir(d){
+    // prevent 180° reversal
+    if(d.x===-dir.x && d.y===-dir.y) return;
+    nextDir=d;
+  }
+  const DIRS={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+  window.addEventListener('keydown',(e)=>{
+    const k=e.key.toLowerCase();
+    if(['arrowup','w'].includes(k)){setDir(DIRS.up);e.preventDefault();}
+    else if(['arrowdown','s'].includes(k)){setDir(DIRS.down);e.preventDefault();}
+    else if(['arrowleft','a'].includes(k)){setDir(DIRS.left);e.preventDefault();}
+    else if(['arrowright','d'].includes(k)){setDir(DIRS.right);e.preventDefault();}
+    else if(k==='p'){ if(running&&!dead){running=false;showOverlay('Paused','Press Play to resume.','▶ Resume');} }
+  });
+  el('pad').addEventListener('click',(e)=>{
+    const b=e.target.closest('button'); if(!b)return; setDir(DIRS[b.dataset.dir]);
+  });
+  // swipe
+  let tsx,tsy;
+  canvas.addEventListener('touchstart',e=>{const t=e.touches[0];tsx=t.clientX;tsy=t.clientY;},{passive:true});
+  canvas.addEventListener('touchmove',e=>{
+    if(tsx==null)return; const t=e.touches[0]; const dx=t.clientX-tsx, dy=t.clientY-tsy;
+    if(Math.abs(dx)+Math.abs(dy)<24)return;
+    if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?DIRS.right:DIRS.left); else setDir(dy>0?DIRS.down:DIRS.up);
+    tsx=null;
+  },{passive:true});
+
+  function step(){
+    dir=nextDir;
+    const head={x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+    // wall collision -> wrap? No: walls kill for challenge. Use wrap-around for friendlier play.
+    if(head.x<0)head.x=COLS-1; else if(head.x>=COLS)head.x=0;
+    if(head.y<0)head.y=ROWS-1; else if(head.y>=ROWS)head.y=0;
+    // self collision
+    if(snake.some((p,i)=>i>0 && p.x===head.x && p.y===head.y)) return gameOver('You bit yourself!');
+    // mine!
+    if(mines.has(key(head.x,head.y))) return gameOver('💥 You hit a mine!');
+    snake.unshift(head);
+    // reveal minesweeper count under head
+    revealed.set(key(head.x,head.y), adjacentMines(head.x,head.y));
+    // food
+    if(head.x===food.x && head.y===food.y){
+      score+=10; if(score>best){best=score;localStorage.setItem('csnake_best',best);bestEl.textContent=best;}
+      food=spawnFood(); speed=Math.max(60, 120 - Math.floor(score/60)*6);
+    } else {
+      snake.pop();
+    }
+    updateHUD();
+  }
+
+  function gameOver(msg){
+    dead=true; running=false;
+    if(score>best){best=score;localStorage.setItem('csnake_best',best);}
+    // reveal all mines
+    for(const m of mines){ const [x,y]=m.split(',').map(Number); revealed.set(m,'M'); }
+    draw();
+    showOverlay('Game Over', msg+'  Score: '+score+'  ·  Best: '+best, '↻ Play again');
+  }
+  function showOverlay(title,text,btn){
+    ovTitle.textContent=title; ovText.textContent=text; playBtn.textContent=btn||'▶ Play';
+    overlay.classList.remove('hide');
+  }
+  function hideOverlay(){ overlay.classList.add('hide'); }
+
+  function greenFor(x,y){
+    // deterministic-ish contribution color for decorative empty cells
+    const h=((x*73856093)^(y*19349663))>>>0;
+    const r=h%100;
+    if(r<64) return null;               // empty
+    if(r<80) return getCSS('--g1');
+    if(r<90) return getCSS('--g2');
+    if(r<96) return getCSS('--g3');
+    return getCSS('--g4');
+  }
+  const cssCache={};
+  function getCSS(v){ return cssCache[v] || (cssCache[v]=getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fill(); }
+
+  function draw(){
+    const W=canvas.clientWidth;
+    ctx.clearRect(0,0,W,W);
+    const occ=occupied();
+    const r=Math.max(2, CELL*0.22);
+    // board
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      const px=PAD+x*CELL, py=PAD+y*CELL, s=CELL-GAP;
+      const k=key(x,y);
+      if(occ.has(k))continue;
+      if(food&&food.x===x&&food.y===y)continue;
+      // revealed cell (minesweeper number / mine)
+      if(revealed.has(k)){
+        const v=revealed.get(k);
+        if(v==='M'){ ctx.fillStyle=getCSS('--mine'); roundRect(px,py,s,s,r);
+          ctx.fillStyle='#fff'; ctx.font=`${Math.floor(s*0.7)}px Fira Code, monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText('💣', px+s/2, py+s/2+1); continue; }
+        ctx.fillStyle='#1b2130'; roundRect(px,py,s,s,r);
+        if(v>0){ const cols=['#8b949e','#39d353','#26a641','#e3b341','#f0883e','#e5534b','#e5534b','#e5534b','#e5534b'];
+          ctx.fillStyle=cols[v]||'#e5534b'; ctx.font=`bold ${Math.floor(s*0.66)}px Fira Code, monospace`;
+          ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(v, px+s/2, py+s/2+1); }
+        continue;
+      }
+      const g=greenFor(x,y);
+      ctx.fillStyle = g || getCSS('--cell');
+      roundRect(px,py,s,s,r);
+    }
+    // food (bright pulsing green)
+    if(food){
+      const px=PAD+food.x*CELL, py=PAD+food.y*CELL, s=CELL-GAP;
+      const pulse=0.5+0.5*Math.sin(performance.now()/220);
+      ctx.save(); ctx.shadowColor=getCSS('--g4'); ctx.shadowBlur=8+6*pulse;
+      ctx.fillStyle=getCSS('--g4'); roundRect(px,py,s,s,r); ctx.restore();
+    }
+    // snake
+    for(let i=snake.length-1;i>=0;i--){
+      const p=snake[i]; const px=PAD+p.x*CELL, py=PAD+p.y*CELL, s=CELL-GAP;
+      ctx.fillStyle = i===0 ? getCSS('--snake-head') : getCSS('--snake');
+      if(i>0){ const t=i/snake.length; ctx.globalAlpha=0.55+0.45*(1-t); }
+      roundRect(px,py,s,s,r); ctx.globalAlpha=1;
+      if(i===0){ // eyes
+        ctx.fillStyle='#0d1117'; const e=Math.max(1.5,s*0.13);
+        const ex=px+s/2+dir.x*s*0.18, ey=py+s/2+dir.y*s*0.18;
+        ctx.beginPath(); ctx.arc(ex-s*0.16+dir.y*s*0.14, ey-s*0.16+dir.x*s*0.14, e,0,7); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex+s*0.16-dir.y*s*0.14, ey+s*0.16-dir.x*s*0.14, e,0,7); ctx.fill();
+      }
+    }
+  }
+
+  function loop(t){
+    if(!lastT)lastT=t; const dt=t-lastT; lastT=t;
+    if(running && !dead){ acc+=dt; if(acc>=speed){ acc=0; step(); } }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if(dead || !snake){ reset(); }
+    running=true; dead=false; lastT=0; hideOverlay();
+  });
+
+  // lightweight state hook (handy for demos / testing)
+  window.__game = { food:()=>({...food}), snake:()=>snake.map(p=>({...p})), mines:()=>[...mines],
+                    dir:()=>({...dir}), setDir, isOver:()=>dead, score:()=>score };
+
+  layout(); reset(); running=false; draw();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
