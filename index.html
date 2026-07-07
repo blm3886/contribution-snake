@@ -14,8 +14,18 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%}
+  html{background:#05060f}
+  /* ── galaxy background ── */
+  #stars{position:fixed; inset:0; width:100%; height:100%; z-index:-2; pointer-events:none}
+  .galaxy-neb{position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(55vmax 55vmax at 18% 12%, rgba(99,102,241,.30), transparent 60%),
+      radial-gradient(50vmax 50vmax at 85% 20%, rgba(139,92,246,.26), transparent 60%),
+      radial-gradient(62vmax 62vmax at 72% 90%, rgba(6,182,212,.20), transparent 62%),
+      radial-gradient(42vmax 42vmax at 10% 85%, rgba(236,72,153,.16), transparent 60%);
+  }
   body{
-    background:radial-gradient(1200px 600px at 50% -10%, #1b2233 0%, var(--bg) 55%);
+    background:transparent;
     color:var(--text); font-family:"Fira Code",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
     min-height:100%; padding:18px 12px 28px; gap:14px;
@@ -71,6 +81,8 @@
 </style>
 </head>
 <body>
+  <canvas id="stars"></canvas>
+  <div class="galaxy-neb"></div>
   <h1>🐍 Contribution Snake × 💣 Minesweeper</h1>
   <div class="sub">Eat the green contributions. Avoid the hidden mines. Numbers = nearby mines.</div>
 
@@ -328,6 +340,23 @@
 
   layout(); reset(); running=false; draw();
   requestAnimationFrame(loop);
+})();
+
+// ── galaxy starfield ──
+(() => {
+  const c=document.getElementById('stars'); if(!c) return; const x=c.getContext('2d');
+  let w,h,stars;
+  function rs(){ w=c.width=innerWidth; h=c.height=innerHeight;
+    const n=Math.min(240, Math.floor(w*h/8500));
+    stars=Array.from({length:n},()=>({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.3+0.2,
+      t:Math.random()*6.28, s:Math.random()*0.03+0.006, z:Math.random()*0.4+0.06,
+      c: Math.random()<0.15 ? '#a5b4fc' : (Math.random()<0.1 ? '#67e8f9' : '#ffffff')})); }
+  addEventListener('resize', rs); rs();
+  (function tick(){ x.clearRect(0,0,w,h);
+    for(const st of stars){ st.t+=st.s; const a=0.35+0.65*(0.5+0.5*Math.sin(st.t));
+      st.y+=st.z*0.12; if(st.y>h){st.y=0; st.x=Math.random()*w;}
+      x.globalAlpha=a; x.fillStyle=st.c; x.beginPath(); x.arc(st.x,st.y,st.r,0,6.3); x.fill(); }
+    x.globalAlpha=1; requestAnimationFrame(tick); })();
 })();
 </script>
 </body>
