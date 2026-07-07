@@ -157,7 +157,7 @@
     const cx=(COLS/2)|0, cy=(ROWS/2)|0;
     snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
     dir={x:1,y:0}; nextDir={x:1,y:0};
-    score=0; dead=false; running=true; tick=0; acc=0; lastT=0; speed=120;
+    score=0; dead=false; running=true; tick=0; acc=0; lastT=0; speed=200;
     revealed=new Map();
     // place mines away from the snake spawn
     mines=new Set();
@@ -225,7 +225,7 @@
     // food
     if(head.x===food.x && head.y===food.y){
       score+=10; if(score>best){best=score;localStorage.setItem('csnake_best',best);bestEl.textContent=best;}
-      food=spawnFood(); speed=Math.max(60, 120 - Math.floor(score/60)*6);
+      food=spawnFood(); speed=Math.max(120, 200 - Math.floor(score/80)*6);
     } else {
       snake.pop();
     }
